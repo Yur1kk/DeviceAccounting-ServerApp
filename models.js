@@ -26,3 +26,4 @@ const imagesSchema = new mongoose.Schema({
 const Images = mongoose.model('Images', imagesSchema);
 
 module.exports = { Devices, Users, Images };
+ 
