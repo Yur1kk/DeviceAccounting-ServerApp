@@ -1,47 +1,40 @@
-// Підключення модулів та створення серверу Express
-const express = require('express');  // Підключення бібліотеки Express для обробки HTTP-запитів
-const app = express();  // Створення екземпляру додатку Express
-const swaggerUi = require('swagger-ui-express');  // Підключення Swagger UI для відображення документації API
-const fs = require("fs");  // Підключення модулю fs для роботи з файловою системою
-const YAML = require('yaml');  // Підключення бібліотеки YAML для роботи з YAML-файлами
-const path = require('path')  // Підключення модулю path для роботи з шляхами
-const bodyParser = require('body-parser');  // Підключення middleware для обробки даних запитів
-const mongoose = require('mongoose');  // Підключення бібліотеки mongoose для роботи з MongoDB
-const multer = require('multer');  // Підключення middleware для обробки файлів, завантажених користувачем
-const session = require('express-session');  // Підключення middleware для роботи з сесіями
-const { Devices, Users, Images } = require('./models');  // Підключення моделей MongoDB
+const express = require('express');
+const app = express();
+const swaggerUi = require('swagger-ui-express');
+const fs = require("fs");
+const YAML = require('yaml');
+const path = require('path');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const multer = require('multer');
+const session = require('express-session');
+const { Devices, Users, Images } = require('./models');
 
-const port = 8000;  // Визначення порту, на якому запускатиметься сервер
+const port = 8000;
 
-// Зчитуємо специфікацію Swagger з файлу YAML
 const file = fs.readFileSync(path.join(__dirname, 'swagger.yaml'), 'utf8');
 const swaggerDocument = YAML.parse(file);
 
-// Налаштування Express та підключення Swagger UI
-app.use(bodyParser.json());  // Використання middleware для обробки JSON-даних
-app.use(bodyParser.urlencoded({ extended: true }));  // Використання middleware для обробки форм
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(
   session({
-    secret: 'scrtky',  // Ключ для шифрування сесій
+    secret: 'scrtky',
     resave: false,
     saveUninitialized: true,
   })
 );
 
-// Встановлюємо шлях для Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-// Підключення до бази даних MongoDB
-mongoose.connect('mongodb://localhost:27017/lab6');  // З'єднання з локальною базою даних MongoDB
+mongoose.connect('mongodb://localhost:27017/lab6');
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
-db.once('open', () => console.log('Connected to MongoDB'));  // Виведення повідомлення при успішному з'єднанні
+db.once('open', () => console.log('Connected to MongoDB'));
 
-// Налаштування Multer для завантаження файлів у пам'ять
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Middleware для перевірки аутентифікації користувача
 const authenticateUser = (req, res, next) => {
   if (!req.session.userId) {
     return res.status(401).json({ message: 'Unauthorized' });
@@ -49,17 +42,13 @@ const authenticateUser = (req, res, next) => {
   next();
 };
 
-// Роути та обробники запитів
-
-// Метод для отримання головної сторінки
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the main page' });
 });
 
-// Метод для отримання списку пристроїв
 app.get('/devices', async (req, res) => {
   try {
-    const devices = await Devices.find();  // Отримання всіх пристроїв з бази даних
+    const devices = await Devices.find();
     res.json(devices);
   } catch (error) {
     console.error(error);
@@ -67,7 +56,6 @@ app.get('/devices', async (req, res) => {
   }
 });
 
-// Метод для отримання пристрою за серійним номером
 app.get('/devices/:serialNumber', async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
@@ -85,7 +73,6 @@ app.get('/devices/:serialNumber', async (req, res) => {
   }
 });
 
-// Метод для редагування пристрою за серійним номером
 app.put('/edit-devices/:serialNumber', async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
@@ -107,7 +94,6 @@ app.put('/edit-devices/:serialNumber', async (req, res) => {
   }
 });
 
-// Метод для видалення пристрою за серійним номером
 app.delete('/delete-device/:serialNumber', async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
@@ -119,7 +105,6 @@ app.delete('/delete-device/:serialNumber', async (req, res) => {
   }
 });
 
-// Метод для створення нового пристрою
 app.post('/devices', async (req, res) => {
   try {
     const newDevice = await Devices.create(req.body);
@@ -130,7 +115,6 @@ app.post('/devices', async (req, res) => {
   }
 });
 
-// Метод для завантаження зображення для пристрою
 app.post('/devices/:serialNumber/upload-image', upload.single('Images'), async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
@@ -152,12 +136,9 @@ app.post('/devices/:serialNumber/upload-image', upload.single('Images'), async (
   }
 });
 
-// Метод для видалення зображення пристрою
 app.delete('/devices/:serialNumber/delete-image', async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
-
-    // Знайти зображення в колекції images за серійним номером
     const image = await Images.findOne({ serialNumber });
 
     if (!image) {
@@ -165,7 +146,6 @@ app.delete('/devices/:serialNumber/delete-image', async (req, res) => {
       return;
     }
 
-    // Видалити зображення
     await Images.findOneAndDelete({ serialNumber });
 
     res.json({ message: 'Image deleted successfully' });
@@ -175,12 +155,9 @@ app.delete('/devices/:serialNumber/delete-image', async (req, res) => {
   }
 });
 
-// Метод для перегляду зображення пристрою
 app.get('/devices/:serialNumber/view-image', async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
-
-    // Знайдіть зображення в колекції images за серійним номером
     const images = await Images.findOne({ serialNumber });
 
     if (!images || !images.data) {
@@ -188,10 +165,7 @@ app.get('/devices/:serialNumber/view-image', async (req, res) => {
       return;
     }
 
-    // Встановлюємо тип контенту як image/jpeg (або інший тип відповідно до формату вашого зображення)
     res.set('Content-Type', 'image/jpeg');
-
-    // Відправляємо base64-кодоване зображення як тіло відповіді
     res.send(Buffer.from(images.data, 'base64'));
   } catch (error) {
     console.error(error);
@@ -199,7 +173,6 @@ app.get('/devices/:serialNumber/view-image', async (req, res) => {
   }
 });
 
-// Метод для реєстрації нового користувача
 app.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -217,7 +190,6 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// Метод для входу користувача
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -228,7 +200,6 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
-    // Встановлюємо ідентифікатор користувача в сесію
     req.session.userId = user._id;
 
     res.json({ message: 'Login successful' });
@@ -238,7 +209,6 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Метод для взяття пристрою у користування
 app.post('/devices/:serialNumber/take', authenticateUser, async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
@@ -272,7 +242,6 @@ app.post('/devices/:serialNumber/take', authenticateUser, async (req, res) => {
   }
 });
 
-// Метод для повернення пристрою на зберігання
 app.post('/devices/:serialNumber/return', authenticateUser, async (req, res) => {
   try {
     const serialNumber = req.params.serialNumber;
@@ -306,7 +275,6 @@ app.post('/devices/:serialNumber/return', authenticateUser, async (req, res) => 
   }
 });
 
-// Метод для виходу користувача з системи
 app.post('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -318,7 +286,6 @@ app.post('/logout', (req, res) => {
   });
 });
 
-// Запуск сервера на вказаному порту
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
